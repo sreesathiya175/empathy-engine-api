@@ -12,12 +12,25 @@ const badgeVariants = cva(
         secondary: "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
         destructive: "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
         outline: "text-foreground",
+        // Priority variants
+        "priority-high": "border-transparent bg-priority-high text-priority-high-foreground",
+        "priority-medium": "border-transparent bg-priority-medium text-priority-medium-foreground",
+        "priority-low": "border-transparent bg-priority-low text-priority-low-foreground",
+        // Status variants
+        "status-pending": "border-transparent bg-status-pending/20 text-status-pending border-status-pending/30",
+        "status-progress": "border-transparent bg-status-progress/20 text-status-progress border-status-progress/30",
+        "status-resolved": "border-transparent bg-status-resolved/20 text-status-resolved border-status-resolved/30",
+        // Sentiment variants
+        "sentiment-positive": "border-transparent bg-sentiment-positive/20 text-sentiment-positive border-sentiment-positive/30",
+        "sentiment-neutral": "border-transparent bg-sentiment-neutral/20 text-sentiment-neutral border-sentiment-neutral/30",
+        "sentiment-negative": "border-transparent bg-sentiment-negative/20 text-sentiment-negative border-sentiment-negative/30",
+        "sentiment-highly-negative": "border-transparent bg-sentiment-highly-negative/20 text-sentiment-highly-negative border-sentiment-highly-negative/30",
       },
     },
     defaultVariants: {
       variant: "default",
     },
-  },
+  }
 );
 
 export interface BadgeProps extends React.HTMLAttributes<HTMLDivElement>, VariantProps<typeof badgeVariants> {}
