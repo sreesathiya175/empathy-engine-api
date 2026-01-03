@@ -31,13 +31,13 @@ export function Header({ isAuthenticated, userRole, userName, onLogout }: Header
   }
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-slate-900 backdrop-blur">
       <div className="container flex h-16 items-center justify-between">
         <Link to="/" className="flex items-center gap-2 transition-opacity hover:opacity-80">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
             <MessageSquareWarning className="h-5 w-5" />
           </div>
-          <span className="font-display text-xl font-bold">GrievEase</span>
+          <span className="font-display text-xl font-bold text-white">GrievEase</span>
         </Link>
 
         {/* Desktop Navigation */}
@@ -64,10 +64,10 @@ export function Header({ isAuthenticated, userRole, userName, onLogout }: Header
         <div className="hidden items-center gap-3 md:flex">
           {isAuthenticated ? (
             <>
-              <span className="text-sm text-muted-foreground">
-                Welcome, <span className="font-medium text-foreground">{userName}</span>
+              <span className="text-sm text-slate-400">
+                Welcome, <span className="font-medium text-white">{userName}</span>
               </span>
-              <Button variant="outline" size="sm" onClick={onLogout}>
+              <Button variant="outline" size="sm" onClick={onLogout} className="border-slate-600 text-slate-200 hover:bg-slate-800">
                 Logout
               </Button>
             </>
@@ -83,7 +83,7 @@ export function Header({ isAuthenticated, userRole, userName, onLogout }: Header
 
         {/* Mobile Menu Button */}
         <button
-          className="md:hidden"
+          className="md:hidden text-white"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
         >
           {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
@@ -92,7 +92,7 @@ export function Header({ isAuthenticated, userRole, userName, onLogout }: Header
 
       {/* Mobile Menu */}
       {mobileMenuOpen && (
-        <div className="border-t border-border bg-background p-4 md:hidden animate-fade-in">
+        <div className="border-t border-slate-700 bg-slate-900 p-4 md:hidden animate-fade-in">
           <nav className="flex flex-col gap-2">
             {navItems.map((item) => {
               const Icon = item.icon;
