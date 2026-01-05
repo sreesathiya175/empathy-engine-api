@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
@@ -13,7 +13,6 @@ import {
   CATEGORIES, 
   CATEGORY_ICONS, 
   type GrievanceCategory,
-  generateTicketId,
   getSentimentFromAnalysis,
   getPriorityFromSentiment
 } from "@/types/grievance";
@@ -27,6 +26,8 @@ import {
   CheckCircle2,
   AlertCircle
 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { useCreateGrievance, DbGrievanceCategory, DbSentimentType, DbPriorityLevel } from "@/hooks/useGrievances";
 
 // Simple sentiment analysis simulation (will be replaced with real AI)
 function analyzeSentiment(text: string): { sentiment: ReturnType<typeof getSentimentFromAnalysis>, score: number } {
@@ -61,12 +62,20 @@ export default function SubmitGrievance() {
   const [description, setDescription] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [analysisResult, setAnalysisResult] = useState<ReturnType<typeof analyzeSentiment> | null>(null);
-  const [ticketId, setTicketId] = useState<string | null>(null);
+  const [submittedTicketId, setSubmittedTicketId] = useState<string | null>(null);
   
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user, profile, role, isLoading: authLoading, signOut } = useAuth();
+  const createGrievance = useCreateGrievance();
+
+  // Redirect if not logged in
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth");
+    }
+  }, [user, authLoading, navigate]);
 
   const handleDescriptionChange = (value: string) => {
     setDescription(value);
@@ -113,6 +122,11 @@ export default function SubmitGrievance() {
     }
   };
 
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/");
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -125,31 +139,60 @@ export default function SubmitGrievance() {
       return;
     }
 
-    setIsSubmitting(true);
-
     // Analyze sentiment if not already done
-    if (!analysisResult) {
-      const result = analyzeSentiment(description);
-      setAnalysisResult(result);
+    let sentimentResult = analysisResult;
+    if (!sentimentResult) {
+      sentimentResult = analyzeSentiment(description);
+      setAnalysisResult(sentimentResult);
     }
 
-    // Simulate submission delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    const priority = getPriorityFromSentiment(sentimentResult.sentiment);
 
-    const newTicketId = generateTicketId();
-    setTicketId(newTicketId);
-    setIsSubmitting(false);
+    try {
+      const result = await createGrievance.mutateAsync({
+        title,
+        category: category as DbGrievanceCategory,
+        description,
+        sentiment: sentimentResult.sentiment as DbSentimentType,
+        priority: priority as DbPriorityLevel
+      });
 
-    toast({
-      title: "Grievance Submitted Successfully!",
-      description: `Your ticket ID is ${newTicketId}. You will receive updates via email.`,
-    });
+      setSubmittedTicketId(result.ticket_id);
+
+      toast({
+        title: "Grievance Submitted Successfully!",
+        description: `Your ticket ID is ${result.ticket_id}. You will receive updates via email.`,
+      });
+    } catch (error: any) {
+      toast({
+        title: "Submission failed",
+        description: error.message || "An error occurred while submitting your grievance.",
+        variant: "destructive"
+      });
+    }
   };
 
-  if (ticketId) {
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  if (submittedTicketId) {
     return (
       <div className="min-h-screen flex flex-col bg-background">
-        <Header isAuthenticated={true} userName="John Doe" onLogout={() => {}} />
+        <Header 
+          isAuthenticated={true} 
+          userName={profile?.name || user?.email || "User"} 
+          userRole={role}
+          onLogout={handleLogout} 
+        />
         
         <main className="flex-1 container py-16 flex items-center justify-center">
           <Card className="max-w-md w-full text-center">
@@ -164,7 +207,7 @@ export default function SubmitGrievance() {
               
               <div className="rounded-lg bg-muted p-4 mb-6">
                 <p className="text-sm text-muted-foreground mb-1">Your Ticket ID</p>
-                <p className="font-mono text-lg font-bold text-primary">{ticketId}</p>
+                <p className="font-mono text-lg font-bold text-primary">{submittedTicketId}</p>
               </div>
 
               {analysisResult && (
@@ -179,7 +222,7 @@ export default function SubmitGrievance() {
                   View Dashboard
                 </Button>
                 <Button variant="outline" onClick={() => {
-                  setTicketId(null);
+                  setSubmittedTicketId(null);
                   setTitle("");
                   setCategory("");
                   setDescription("");
@@ -200,7 +243,12 @@ export default function SubmitGrievance() {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <Header isAuthenticated={true} userName="John Doe" onLogout={() => {}} />
+      <Header 
+        isAuthenticated={true} 
+        userName={profile?.name || user?.email || "User"} 
+        userRole={role}
+        onLogout={handleLogout} 
+      />
       
       <main className="flex-1 container py-8">
         <div className="max-w-2xl mx-auto">
@@ -351,9 +399,9 @@ export default function SubmitGrievance() {
                   type="submit" 
                   className="w-full" 
                   size="lg"
-                  disabled={isSubmitting}
+                  disabled={createGrievance.isPending}
                 >
-                  {isSubmitting ? (
+                  {createGrievance.isPending ? (
                     <>
                       <Loader2 className="h-4 w-4 animate-spin" />
                       Submitting...
