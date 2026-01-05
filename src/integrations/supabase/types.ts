@@ -14,16 +14,160 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      grievance_comments: {
+        Row: {
+          content: string
+          created_at: string
+          grievance_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          grievance_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          grievance_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grievance_comments_grievance_id_fkey"
+            columns: ["grievance_id"]
+            isOneToOne: false
+            referencedRelation: "grievances"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      grievances: {
+        Row: {
+          assigned_to: string | null
+          category: Database["public"]["Enums"]["grievance_category"]
+          created_at: string
+          description: string
+          file_url: string | null
+          id: string
+          priority: Database["public"]["Enums"]["priority_level"]
+          sentiment: Database["public"]["Enums"]["sentiment_type"]
+          status: Database["public"]["Enums"]["grievance_status"]
+          ticket_id: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          assigned_to?: string | null
+          category: Database["public"]["Enums"]["grievance_category"]
+          created_at?: string
+          description: string
+          file_url?: string | null
+          id?: string
+          priority?: Database["public"]["Enums"]["priority_level"]
+          sentiment?: Database["public"]["Enums"]["sentiment_type"]
+          status?: Database["public"]["Enums"]["grievance_status"]
+          ticket_id: string
+          title: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          assigned_to?: string | null
+          category?: Database["public"]["Enums"]["grievance_category"]
+          created_at?: string
+          description?: string
+          file_url?: string | null
+          id?: string
+          priority?: Database["public"]["Enums"]["priority_level"]
+          sentiment?: Database["public"]["Enums"]["sentiment_type"]
+          status?: Database["public"]["Enums"]["grievance_status"]
+          ticket_id?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string
+          email: string
+          id: string
+          name: string | null
+          updated_at: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string
+          email: string
+          id: string
+          name?: string | null
+          updated_at?: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string
+          email?: string
+          id?: string
+          name?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "citizen" | "employee" | "admin"
+      grievance_category:
+        | "IT"
+        | "HR"
+        | "Infrastructure"
+        | "Academic"
+        | "Finance"
+        | "Administration"
+        | "Other"
+      grievance_status: "pending" | "in_progress" | "resolved"
+      priority_level: "high" | "medium" | "low"
+      sentiment_type: "highly_negative" | "negative" | "neutral" | "positive"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +294,20 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["citizen", "employee", "admin"],
+      grievance_category: [
+        "IT",
+        "HR",
+        "Infrastructure",
+        "Academic",
+        "Finance",
+        "Administration",
+        "Other",
+      ],
+      grievance_status: ["pending", "in_progress", "resolved"],
+      priority_level: ["high", "medium", "low"],
+      sentiment_type: ["highly_negative", "negative", "neutral", "positive"],
+    },
   },
 } as const

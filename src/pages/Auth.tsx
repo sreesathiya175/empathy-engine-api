@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,7 +7,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { MessageSquareWarning, Mail, Lock, User, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { type UserRole } from "@/types/grievance";
+import { useAuth } from "@/hooks/useAuth";
+
+type UserRole = 'citizen' | 'employee' | 'admin';
 
 export default function Auth() {
   const [isLogin, setIsLogin] = useState(true);
@@ -18,22 +20,98 @@ export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { user, signIn, signUp } = useAuth();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user) {
+      navigate("/dashboard");
+    }
+  }, [user, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!email || !password) {
+      toast({
+        title: "Missing fields",
+        description: "Please enter email and password.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!isLogin && !name) {
+      toast({
+        title: "Missing fields",
+        description: "Please enter your name.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (password.length < 6) {
+      toast({
+        title: "Password too short",
+        description: "Password must be at least 6 characters.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setIsLoading(true);
 
-    // Simulate authentication - will be replaced with real auth
-    setTimeout(() => {
+    try {
+      if (isLogin) {
+        const { error } = await signIn(email, password);
+        if (error) {
+          if (error.message.includes("Invalid login credentials")) {
+            toast({
+              title: "Login failed",
+              description: "Invalid email or password. Please try again.",
+              variant: "destructive"
+            });
+          } else {
+            toast({
+              title: "Login failed",
+              description: error.message,
+              variant: "destructive"
+            });
+          }
+          return;
+        }
+        toast({
+          title: "Welcome back!",
+          description: "You have successfully logged in.",
+        });
+        navigate("/dashboard");
+      } else {
+        const { error } = await signUp(email, password, name, role);
+        if (error) {
+          if (error.message.includes("User already registered")) {
+            toast({
+              title: "Account exists",
+              description: "An account with this email already exists. Please sign in instead.",
+              variant: "destructive"
+            });
+          } else {
+            toast({
+              title: "Sign up failed",
+              description: error.message,
+              variant: "destructive"
+            });
+          }
+          return;
+        }
+        toast({
+          title: "Account created!",
+          description: "Your account has been created. You can now submit grievances.",
+        });
+        navigate("/dashboard");
+      }
+    } finally {
       setIsLoading(false);
-      toast({
-        title: isLogin ? "Welcome back!" : "Account created!",
-        description: isLogin 
-          ? "You have successfully logged in." 
-          : "Your account has been created. You can now submit grievances.",
-      });
-      navigate("/dashboard");
-    }, 1500);
+    }
   };
 
   return (
@@ -173,6 +251,7 @@ export default function Auth() {
                       onChange={(e) => setPassword(e.target.value)}
                       className="pl-10"
                       required
+                      minLength={6}
                     />
                   </div>
                 </div>

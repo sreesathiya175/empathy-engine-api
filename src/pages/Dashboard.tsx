@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { StatCard } from "@/components/dashboard/StatCard";
@@ -6,6 +7,7 @@ import { GrievanceCard } from "@/components/grievance/GrievanceCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { 
   FileText, 
   Clock, 
@@ -18,105 +20,41 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { 
-  type Grievance, 
-  type GrievanceStatus, 
-  type PriorityLevel,
-  type SentimentType,
-  CATEGORIES,
-  type GrievanceCategory
+  type Grievance,
+  CATEGORIES
 } from "@/types/grievance";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
+import { useAuth } from "@/hooks/useAuth";
+import { useGrievances, useGrievanceStats, DbGrievance } from "@/hooks/useGrievances";
 
-// Mock data for demonstration
-const mockGrievances: Grievance[] = [
-  {
-    id: "1",
-    ticket_id: "GRV-ABC123-XYZ",
-    user_id: "user1",
-    category: "IT",
-    title: "Network connectivity issues in Building A",
-    description: "The WiFi has been extremely slow and disconnecting frequently for the past week. This is severely impacting our work productivity.",
-    sentiment: "highly_negative",
-    priority: "high",
-    status: "in_progress",
-    assigned_to: "tech_team",
-    created_at: "2024-01-15T10:30:00Z",
-    updated_at: "2024-01-16T14:00:00Z"
-  },
-  {
-    id: "2",
-    ticket_id: "GRV-DEF456-ABC",
-    user_id: "user2",
-    category: "HR",
-    title: "Request for flexible working hours",
-    description: "I would like to request flexible working hours to better manage my work-life balance. I believe this would increase my productivity.",
-    sentiment: "neutral",
-    priority: "low",
-    status: "pending",
-    created_at: "2024-01-14T09:15:00Z",
-    updated_at: "2024-01-14T09:15:00Z"
-  },
-  {
-    id: "3",
-    ticket_id: "GRV-GHI789-DEF",
-    user_id: "user3",
-    category: "Infrastructure",
-    title: "Air conditioning not working in Conference Room 3",
-    description: "The AC unit in Conference Room 3 has stopped working. Meetings are becoming uncomfortable. Please fix this issue urgently.",
-    sentiment: "negative",
-    priority: "medium",
-    status: "pending",
-    created_at: "2024-01-13T16:45:00Z",
-    updated_at: "2024-01-13T16:45:00Z"
-  },
-  {
-    id: "4",
-    ticket_id: "GRV-JKL012-GHI",
-    user_id: "user4",
-    category: "Academic",
-    title: "Appreciation for new library resources",
-    description: "I am delighted with the new digital resources added to the library. The research databases are extremely helpful for my thesis work.",
-    sentiment: "positive",
-    priority: "low",
-    status: "resolved",
-    created_at: "2024-01-12T11:20:00Z",
-    updated_at: "2024-01-12T15:30:00Z"
-  },
-  {
-    id: "5",
-    ticket_id: "GRV-MNO345-JKL",
-    user_id: "user5",
-    category: "Finance",
-    title: "Delay in reimbursement processing",
-    description: "My travel reimbursement submitted 3 weeks ago is still pending. This is causing financial strain. Please expedite the process.",
-    sentiment: "negative",
-    priority: "medium",
-    status: "in_progress",
-    assigned_to: "finance_team",
-    created_at: "2024-01-10T08:00:00Z",
-    updated_at: "2024-01-15T10:00:00Z"
-  }
-];
-
-const sentimentData = [
-  { name: "Positive", value: 15, color: "hsl(142, 71%, 45%)" },
-  { name: "Neutral", value: 25, color: "hsl(200, 15%, 50%)" },
-  { name: "Negative", value: 35, color: "hsl(38, 92%, 50%)" },
-  { name: "Highly Negative", value: 25, color: "hsl(0, 72%, 51%)" }
-];
-
-const categoryData = CATEGORIES.map((cat, index) => ({
-  name: cat,
-  count: Math.floor(Math.random() * 20) + 5
-}));
+// Convert DB grievance to frontend type
+function toGrievance(dbGrievance: DbGrievance): Grievance {
+  return {
+    ...dbGrievance,
+    assigned_to: dbGrievance.assigned_to || undefined,
+    file_url: dbGrievance.file_url || undefined
+  };
+}
 
 export default function Dashboard() {
+  const navigate = useNavigate();
+  const { user, profile, role, isLoading: authLoading, signOut } = useAuth();
+  const { data: grievances, isLoading: grievancesLoading } = useGrievances();
+  const { stats, sentimentData, categoryData, isLoading: statsLoading } = useGrievanceStats();
+
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
 
-  const filteredGrievances = mockGrievances.filter((g) => {
+  // Redirect if not logged in
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate("/auth");
+    }
+  }, [user, authLoading, navigate]);
+
+  const filteredGrievances = (grievances || []).filter((g) => {
     const matchesSearch = g.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
       g.ticket_id.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || g.status === statusFilter;
@@ -125,21 +63,30 @@ export default function Dashboard() {
     return matchesSearch && matchesStatus && matchesPriority && matchesCategory;
   });
 
-  const stats = {
-    total: mockGrievances.length,
-    pending: mockGrievances.filter(g => g.status === "pending").length,
-    inProgress: mockGrievances.filter(g => g.status === "in_progress").length,
-    resolved: mockGrievances.filter(g => g.status === "resolved").length,
-    highPriority: mockGrievances.filter(g => g.priority === "high").length
+  const handleLogout = async () => {
+    await signOut();
+    navigate("/");
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header 
         isAuthenticated={true} 
-        userName="John Doe" 
-        userRole="admin"
-        onLogout={() => {}}
+        userName={profile?.name || user?.email || "User"} 
+        userRole={role}
+        onLogout={handleLogout}
       />
       
       <main className="flex-1 container py-8">
@@ -159,36 +106,46 @@ export default function Dashboard() {
 
         {/* Stats Grid */}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 mb-8">
-          <StatCard
-            title="Total Grievances"
-            value={stats.total}
-            icon={FileText}
-            variant="primary"
-          />
-          <StatCard
-            title="Pending"
-            value={stats.pending}
-            icon={Clock}
-            variant="warning"
-          />
-          <StatCard
-            title="In Progress"
-            value={stats.inProgress}
-            icon={Loader2}
-            variant="default"
-          />
-          <StatCard
-            title="Resolved"
-            value={stats.resolved}
-            icon={CheckCircle2}
-            variant="success"
-          />
-          <StatCard
-            title="High Priority"
-            value={stats.highPriority}
-            icon={AlertTriangle}
-            variant="danger"
-          />
+          {statsLoading ? (
+            <>
+              {[...Array(5)].map((_, i) => (
+                <Skeleton key={i} className="h-24 rounded-xl" />
+              ))}
+            </>
+          ) : (
+            <>
+              <StatCard
+                title="Total Grievances"
+                value={stats.total}
+                icon={FileText}
+                variant="primary"
+              />
+              <StatCard
+                title="Pending"
+                value={stats.pending}
+                icon={Clock}
+                variant="warning"
+              />
+              <StatCard
+                title="In Progress"
+                value={stats.inProgress}
+                icon={Loader2}
+                variant="default"
+              />
+              <StatCard
+                title="Resolved"
+                value={stats.resolved}
+                icon={CheckCircle2}
+                variant="success"
+              />
+              <StatCard
+                title="High Priority"
+                value={stats.highPriority}
+                icon={AlertTriangle}
+                variant="danger"
+              />
+            </>
+          )}
         </div>
 
         {/* Charts Section */}
@@ -197,25 +154,35 @@ export default function Dashboard() {
           <div className="rounded-xl border border-border bg-card p-6">
             <h3 className="font-display text-lg font-semibold mb-4">Sentiment Distribution</h3>
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={sentimentData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={90}
-                    paddingAngle={2}
-                    dataKey="value"
-                  >
-                    {sentimentData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
+              {statsLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : stats.total === 0 ? (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  No data yet
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={sentimentData.filter(d => d.value > 0)}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={90}
+                      paddingAngle={2}
+                      dataKey="value"
+                    >
+                      {sentimentData.filter(d => d.value > 0).map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
 
@@ -223,14 +190,24 @@ export default function Dashboard() {
           <div className="rounded-xl border border-border bg-card p-6">
             <h3 className="font-display text-lg font-semibold mb-4">Grievances by Category</h3>
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={categoryData}>
-                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="count" fill="hsl(173, 58%, 26%)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              {statsLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : stats.total === 0 ? (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  No data yet
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={categoryData.filter(d => d.count > 0)}>
+                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                    <YAxis />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="hsl(173, 58%, 26%)" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </div>
         </div>
@@ -288,18 +265,37 @@ export default function Dashboard() {
         </div>
 
         {/* Grievances List */}
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filteredGrievances.map((grievance) => (
-            <GrievanceCard key={grievance.id} grievance={grievance} />
-          ))}
-        </div>
-
-        {filteredGrievances.length === 0 && (
-          <div className="text-center py-12">
-            <FileText className="mx-auto h-12 w-12 text-muted-foreground/50" />
-            <h3 className="mt-4 text-lg font-semibold">No grievances found</h3>
-            <p className="text-muted-foreground">Try adjusting your filters or search term</p>
+        {grievancesLoading ? (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {[...Array(6)].map((_, i) => (
+              <Skeleton key={i} className="h-48 rounded-xl" />
+            ))}
           </div>
+        ) : (
+          <>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {filteredGrievances.map((grievance) => (
+                <GrievanceCard key={grievance.id} grievance={toGrievance(grievance)} />
+              ))}
+            </div>
+
+            {filteredGrievances.length === 0 && (
+              <div className="text-center py-12">
+                <FileText className="mx-auto h-12 w-12 text-muted-foreground/50" />
+                <h3 className="mt-4 text-lg font-semibold">No grievances found</h3>
+                <p className="text-muted-foreground">
+                  {(grievances?.length || 0) === 0 
+                    ? "Submit your first grievance to get started" 
+                    : "Try adjusting your filters or search term"}
+                </p>
+                {(grievances?.length || 0) === 0 && (
+                  <Link to="/submit" className="mt-4 inline-block">
+                    <Button>Submit Grievance</Button>
+                  </Link>
+                )}
+              </div>
+            )}
+          </>
         )}
       </main>
 
