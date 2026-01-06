@@ -4,10 +4,12 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { GrievanceCard } from "@/components/grievance/GrievanceCard";
+import { GrievanceDetailDialog } from "@/components/grievance/GrievanceDetailDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   FileText, 
   Clock, 
@@ -16,7 +18,8 @@ import {
   AlertTriangle,
   Search,
   Filter,
-  PlusCircle
+  PlusCircle,
+  UserCheck
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { 
@@ -25,7 +28,7 @@ import {
 } from "@/types/grievance";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from "recharts";
 import { useAuth } from "@/hooks/useAuth";
-import { useGrievances, useGrievanceStats, DbGrievance } from "@/hooks/useGrievances";
+import { useGrievances, useGrievanceStats, useAssignedGrievances, DbGrievance } from "@/hooks/useGrievances";
 
 // Convert DB grievance to frontend type
 function toGrievance(dbGrievance: DbGrievance): Grievance {
@@ -40,12 +43,17 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const { user, profile, role, isLoading: authLoading, signOut } = useAuth();
   const { data: grievances, isLoading: grievancesLoading } = useGrievances();
+  const { data: assignedGrievances, isLoading: assignedLoading } = useAssignedGrievances();
   const { stats, sentimentData, categoryData, isLoading: statsLoading } = useGrievanceStats();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [selectedGrievance, setSelectedGrievance] = useState<DbGrievance | null>(null);
+  const [activeTab, setActiveTab] = useState("all");
+
+  const isStaff = role === 'employee' || role === 'admin';
 
   // Redirect if not logged in
   useEffect(() => {
@@ -54,18 +62,27 @@ export default function Dashboard() {
     }
   }, [user, authLoading, navigate]);
 
-  const filteredGrievances = (grievances || []).filter((g) => {
-    const matchesSearch = g.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      g.ticket_id.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "all" || g.status === statusFilter;
-    const matchesPriority = priorityFilter === "all" || g.priority === priorityFilter;
-    const matchesCategory = categoryFilter === "all" || g.category === categoryFilter;
-    return matchesSearch && matchesStatus && matchesPriority && matchesCategory;
-  });
+  const filterGrievances = (list: DbGrievance[] | undefined) => {
+    return (list || []).filter((g) => {
+      const matchesSearch = g.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        g.ticket_id.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesStatus = statusFilter === "all" || g.status === statusFilter;
+      const matchesPriority = priorityFilter === "all" || g.priority === priorityFilter;
+      const matchesCategory = categoryFilter === "all" || g.category === categoryFilter;
+      return matchesSearch && matchesStatus && matchesPriority && matchesCategory;
+    });
+  };
+
+  const filteredGrievances = filterGrievances(grievances);
+  const filteredAssigned = filterGrievances(assignedGrievances);
 
   const handleLogout = async () => {
     await signOut();
     navigate("/");
+  };
+
+  const handleCardClick = (grievance: DbGrievance) => {
+    setSelectedGrievance(grievance);
   };
 
   if (authLoading) {
@@ -264,38 +281,133 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Grievances List */}
-        {grievancesLoading ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {[...Array(6)].map((_, i) => (
-              <Skeleton key={i} className="h-48 rounded-xl" />
-            ))}
-          </div>
+        {/* Grievances List with Tabs for Staff */}
+        {isStaff ? (
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <TabsList className="mb-4">
+              <TabsTrigger value="all" className="gap-2">
+                <FileText className="h-4 w-4" />
+                All Grievances
+              </TabsTrigger>
+              <TabsTrigger value="assigned" className="gap-2">
+                <UserCheck className="h-4 w-4" />
+                Assigned to Me ({assignedGrievances?.length || 0})
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="all">
+              {grievancesLoading ? (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {[...Array(6)].map((_, i) => (
+                    <Skeleton key={i} className="h-48 rounded-xl" />
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {filteredGrievances.map((grievance) => (
+                      <GrievanceCard 
+                        key={grievance.id} 
+                        grievance={toGrievance(grievance)}
+                        onClick={() => handleCardClick(grievance)}
+                      />
+                    ))}
+                  </div>
+
+                  {filteredGrievances.length === 0 && (
+                    <div className="text-center py-12">
+                      <FileText className="mx-auto h-12 w-12 text-muted-foreground/50" />
+                      <h3 className="mt-4 text-lg font-semibold">No grievances found</h3>
+                      <p className="text-muted-foreground">
+                        {(grievances?.length || 0) === 0 
+                          ? "No grievances submitted yet" 
+                          : "Try adjusting your filters or search term"}
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+            </TabsContent>
+
+            <TabsContent value="assigned">
+              {assignedLoading ? (
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {[...Array(3)].map((_, i) => (
+                    <Skeleton key={i} className="h-48 rounded-xl" />
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                    {filteredAssigned.map((grievance) => (
+                      <GrievanceCard 
+                        key={grievance.id} 
+                        grievance={toGrievance(grievance)}
+                        onClick={() => handleCardClick(grievance)}
+                      />
+                    ))}
+                  </div>
+
+                  {filteredAssigned.length === 0 && (
+                    <div className="text-center py-12">
+                      <UserCheck className="mx-auto h-12 w-12 text-muted-foreground/50" />
+                      <h3 className="mt-4 text-lg font-semibold">No assigned grievances</h3>
+                      <p className="text-muted-foreground">
+                        Grievances assigned to you will appear here
+                      </p>
+                    </div>
+                  )}
+                </>
+              )}
+            </TabsContent>
+          </Tabs>
         ) : (
-          <>
+          /* Regular user view */
+          grievancesLoading ? (
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {filteredGrievances.map((grievance) => (
-                <GrievanceCard key={grievance.id} grievance={toGrievance(grievance)} />
+              {[...Array(6)].map((_, i) => (
+                <Skeleton key={i} className="h-48 rounded-xl" />
               ))}
             </div>
-
-            {filteredGrievances.length === 0 && (
-              <div className="text-center py-12">
-                <FileText className="mx-auto h-12 w-12 text-muted-foreground/50" />
-                <h3 className="mt-4 text-lg font-semibold">No grievances found</h3>
-                <p className="text-muted-foreground">
-                  {(grievances?.length || 0) === 0 
-                    ? "Submit your first grievance to get started" 
-                    : "Try adjusting your filters or search term"}
-                </p>
-                {(grievances?.length || 0) === 0 && (
-                  <Link to="/submit" className="mt-4 inline-block">
-                    <Button>Submit Grievance</Button>
-                  </Link>
-                )}
+          ) : (
+            <>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {filteredGrievances.map((grievance) => (
+                  <GrievanceCard 
+                    key={grievance.id} 
+                    grievance={toGrievance(grievance)}
+                    onClick={() => handleCardClick(grievance)}
+                  />
+                ))}
               </div>
-            )}
-          </>
+
+              {filteredGrievances.length === 0 && (
+                <div className="text-center py-12">
+                  <FileText className="mx-auto h-12 w-12 text-muted-foreground/50" />
+                  <h3 className="mt-4 text-lg font-semibold">No grievances found</h3>
+                  <p className="text-muted-foreground">
+                    {(grievances?.length || 0) === 0 
+                      ? "Submit your first grievance to get started" 
+                      : "Try adjusting your filters or search term"}
+                  </p>
+                  {(grievances?.length || 0) === 0 && (
+                    <Link to="/submit" className="mt-4 inline-block">
+                      <Button>Submit Grievance</Button>
+                    </Link>
+                  )}
+                </div>
+              )}
+            </>
+          )
+        )}
+
+        {/* Grievance Detail Dialog */}
+        {selectedGrievance && (
+          <GrievanceDetailDialog 
+            grievance={selectedGrievance}
+            open={!!selectedGrievance}
+            onOpenChange={(open) => !open && setSelectedGrievance(null)}
+          />
         )}
       </main>
 
