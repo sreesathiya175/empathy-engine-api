@@ -27,7 +27,8 @@ import {
   AlertCircle
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useCreateGrievance, DbGrievanceCategory, DbSentimentType, DbPriorityLevel } from "@/hooks/useGrievances";
+import { useCreateGrievance, useAssignGrievance, DbGrievanceCategory, DbSentimentType, DbPriorityLevel } from "@/hooks/useGrievances";
+import { useStaff, getAutoAssignee } from "@/hooks/useStaff";
 
 // Simple sentiment analysis simulation (will be replaced with real AI)
 function analyzeSentiment(text: string): { sentiment: ReturnType<typeof getSentimentFromAnalysis>, score: number } {
@@ -69,6 +70,8 @@ export default function SubmitGrievance() {
   const navigate = useNavigate();
   const { user, profile, role, isLoading: authLoading, signOut } = useAuth();
   const createGrievance = useCreateGrievance();
+  const assignGrievance = useAssignGrievance();
+  const { data: staffList } = useStaff();
 
   // Redirect if not logged in
   useEffect(() => {
@@ -157,11 +160,19 @@ export default function SubmitGrievance() {
         priority: priority as DbPriorityLevel
       });
 
+      // Auto-assign to a staff member based on category and priority
+      if (staffList && staffList.length > 0) {
+        const autoAssignee = getAutoAssignee(category, priority, staffList);
+        if (autoAssignee) {
+          await assignGrievance.mutateAsync({ id: result.id, assignedTo: autoAssignee });
+        }
+      }
+
       setSubmittedTicketId(result.ticket_id);
 
       toast({
         title: "Grievance Submitted Successfully!",
-        description: `Your ticket ID is ${result.ticket_id}. You will receive updates via email.`,
+        description: `Your ticket ID is ${result.ticket_id}. It has been automatically assigned to a staff member.`,
       });
     } catch (error: any) {
       toast({
@@ -388,8 +399,8 @@ export default function SubmitGrievance() {
                     <p className="font-medium">What happens next?</p>
                     <p className="text-muted-foreground mt-1">
                       After submission, your grievance will be automatically analyzed for sentiment, 
-                      assigned a priority level, and routed to the appropriate department. 
-                      You'll receive email updates on progress.
+                      assigned a priority level, and <strong>automatically assigned to a staff member</strong> based on 
+                      category and priority. You can track progress from your dashboard.
                     </p>
                   </div>
                 </div>

@@ -127,7 +127,52 @@ export function useUpdateGrievanceStatus() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['grievances'] });
       queryClient.invalidateQueries({ queryKey: ['my-grievances'] });
+      queryClient.invalidateQueries({ queryKey: ['assigned-grievances'] });
     }
+  });
+}
+
+export function useAssignGrievance() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, assignedTo }: { id: string; assignedTo: string | null }) => {
+      const { data, error } = await supabase
+        .from('grievances')
+        .update({ assigned_to: assignedTo })
+        .eq('id', id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data as DbGrievance;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['grievances'] });
+      queryClient.invalidateQueries({ queryKey: ['my-grievances'] });
+      queryClient.invalidateQueries({ queryKey: ['assigned-grievances'] });
+    }
+  });
+}
+
+export function useAssignedGrievances() {
+  const { user } = useAuth();
+
+  return useQuery({
+    queryKey: ['assigned-grievances', user?.id],
+    queryFn: async () => {
+      if (!user) return [];
+
+      const { data, error } = await supabase
+        .from('grievances')
+        .select('*')
+        .eq('assigned_to', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      return data as DbGrievance[];
+    },
+    enabled: !!user
   });
 }
 
