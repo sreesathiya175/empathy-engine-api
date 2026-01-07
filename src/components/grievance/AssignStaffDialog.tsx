@@ -44,8 +44,8 @@ export function AssignStaffDialog({ grievance, open, onOpenChange }: AssignStaff
     }
 
     try {
-      await assignMutation.mutateAsync({ id: grievance.id, assignedTo: selectedStaff });
-      toast.success("Grievance assigned successfully");
+      await assignMutation.mutateAsync({ id: grievance.id, assignedTo: selectedStaff, grievance });
+      toast.success("Grievance assigned successfully. Notification sent to staff member.");
       onOpenChange(false);
     } catch (error) {
       toast.error("Failed to assign grievance");
