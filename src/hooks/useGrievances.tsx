@@ -1,7 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "./useAuth";
-import { generateTicketId, getSentimentFromAnalysis, getPriorityFromSentiment } from "@/types/grievance";
+import { generateTicketId } from "@/types/grievance";
+import { notifyAssignment, notifyStatusChange } from "./useNotifications";
 
 export type DbGrievanceCategory = 'IT' | 'HR' | 'Infrastructure' | 'Academic' | 'Finance' | 'Administration' | 'Other';
 export type DbSentimentType = 'highly_negative' | 'negative' | 'neutral' | 'positive';
@@ -113,7 +114,7 @@ export function useUpdateGrievanceStatus() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, status }: { id: string; status: DbGrievanceStatus }) => {
+    mutationFn: async ({ id, status, grievance }: { id: string; status: DbGrievanceStatus; grievance?: DbGrievance }) => {
       const { data, error } = await supabase
         .from('grievances')
         .update({ status })
@@ -122,6 +123,19 @@ export function useUpdateGrievanceStatus() {
         .single();
 
       if (error) throw error;
+      
+      // Send notification to grievance owner about status change
+      if (grievance) {
+        notifyStatusChange(
+          id,
+          grievance.title,
+          grievance.ticket_id,
+          grievance.user_id,
+          grievance.status,
+          status
+        ).catch(err => console.error("Failed to send status notification:", err));
+      }
+      
       return data as DbGrievance;
     },
     onSuccess: () => {
@@ -134,9 +148,10 @@ export function useUpdateGrievanceStatus() {
 
 export function useAssignGrievance() {
   const queryClient = useQueryClient();
+  const { profile } = useAuth();
 
   return useMutation({
-    mutationFn: async ({ id, assignedTo }: { id: string; assignedTo: string | null }) => {
+    mutationFn: async ({ id, assignedTo, grievance }: { id: string; assignedTo: string | null; grievance?: DbGrievance }) => {
       const { data, error } = await supabase
         .from('grievances')
         .update({ assigned_to: assignedTo })
@@ -145,6 +160,18 @@ export function useAssignGrievance() {
         .single();
 
       if (error) throw error;
+      
+      // Send notification to newly assigned staff
+      if (assignedTo && grievance) {
+        notifyAssignment(
+          id,
+          grievance.title,
+          grievance.ticket_id,
+          assignedTo,
+          profile?.name || undefined
+        ).catch(err => console.error("Failed to send assignment notification:", err));
+      }
+      
       return data as DbGrievance;
     },
     onSuccess: () => {

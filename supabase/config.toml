@@ -1,1 +1,4 @@
 project_id = "kamlntakjvmirvwbemyv"
+
+[functions.send-grievance-notification]
+verify_jwt = false

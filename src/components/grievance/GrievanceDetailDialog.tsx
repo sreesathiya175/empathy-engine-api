@@ -44,8 +44,8 @@ export function GrievanceDetailDialog({ grievance, open, onOpenChange }: Grievan
 
   const handleStatusChange = async (newStatus: DbGrievanceStatus) => {
     try {
-      await updateStatusMutation.mutateAsync({ id: grievance.id, status: newStatus });
-      toast.success(`Status updated to ${newStatus.replace('_', ' ')}`);
+      await updateStatusMutation.mutateAsync({ id: grievance.id, status: newStatus, grievance });
+      toast.success(`Status updated to ${newStatus.replace('_', ' ')}. Notification sent to user.`);
     } catch (error) {
       toast.error("Failed to update status");
     }
