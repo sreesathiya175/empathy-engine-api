@@ -111,6 +111,21 @@ const handler = async (req: Request): Promise<Response> => {
     
     if (!emailResponse.ok) {
       console.error("Email send failed:", emailData);
+      
+      // Handle Resend test mode limitation gracefully
+      if (emailData.statusCode === 403 && emailData.message?.includes("testing emails")) {
+        console.warn("Resend is in test mode - email would be sent to:", recipientEmail);
+        console.warn("To send emails to other recipients, verify a domain at resend.com/domains");
+        return new Response(JSON.stringify({ 
+          success: true, 
+          warning: "Email skipped - Resend in test mode. Verify a domain to enable full email functionality.",
+          wouldSendTo: recipientEmail 
+        }), {
+          status: 200,
+          headers: { "Content-Type": "application/json", ...corsHeaders },
+        });
+      }
+      
       throw new Error(emailData.message || "Failed to send email");
     }
 
