@@ -4,6 +4,7 @@ import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { useAuth } from "@/hooks/useAuth";
 import { useGrievances, DbGrievance, useUpdateGrievanceStatus, useAssignGrievance } from "@/hooks/useGrievances";
+import { supabase } from "@/integrations/supabase/client";
 import { useStaff, StaffMember } from "@/hooks/useStaff";
 import { 
   Table, 
@@ -71,7 +72,7 @@ export default function Admin() {
       
       if (uncachedIds.length === 0) return;
 
-      const { data } = await (await import("@/integrations/supabase/client")).supabase
+      const { data } = await supabase
         .from('profiles')
         .select('id, name, email')
         .in('id', uncachedIds);
