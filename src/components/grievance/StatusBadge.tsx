@@ -1,6 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { type GrievanceStatus } from "@/types/grievance";
-import { Clock, Loader2, CheckCircle2 } from "lucide-react";
+import { Clock, Loader2, CheckCircle2, XCircle } from "lucide-react";
 
 interface StatusBadgeProps {
   status: GrievanceStatus;
@@ -9,7 +9,7 @@ interface StatusBadgeProps {
 
 const statusConfig: Record<GrievanceStatus, { 
   label: string; 
-  variant: "status-pending" | "status-progress" | "status-resolved";
+  variant: "status-pending" | "status-progress" | "status-resolved" | "default";
   icon: typeof Clock;
 }> = {
   pending: { 
@@ -26,6 +26,11 @@ const statusConfig: Record<GrievanceStatus, {
     label: "Resolved", 
     variant: "status-resolved",
     icon: CheckCircle2
+  },
+  closed: { 
+    label: "Closed", 
+    variant: "default",
+    icon: XCircle
   },
 };
 

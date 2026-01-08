@@ -7,7 +7,7 @@ import { notifyAssignment, notifyStatusChange } from "./useNotifications";
 export type DbGrievanceCategory = 'IT' | 'HR' | 'Infrastructure' | 'Academic' | 'Finance' | 'Administration' | 'Other';
 export type DbSentimentType = 'highly_negative' | 'negative' | 'neutral' | 'positive';
 export type DbPriorityLevel = 'high' | 'medium' | 'low';
-export type DbGrievanceStatus = 'pending' | 'in_progress' | 'resolved';
+export type DbGrievanceStatus = 'pending' | 'in_progress' | 'resolved' | 'closed';
 
 export interface DbGrievance {
   id: string;

@@ -13,7 +13,7 @@ export type SentimentType = 'highly_negative' | 'negative' | 'neutral' | 'positi
 
 export type PriorityLevel = 'high' | 'medium' | 'low';
 
-export type GrievanceStatus = 'pending' | 'in_progress' | 'resolved';
+export type GrievanceStatus = 'pending' | 'in_progress' | 'resolved' | 'closed';
 
 export interface User {
   id: string;

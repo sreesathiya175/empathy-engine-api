@@ -165,7 +165,7 @@ export type Database = {
         | "Finance"
         | "Administration"
         | "Other"
-      grievance_status: "pending" | "in_progress" | "resolved"
+      grievance_status: "pending" | "in_progress" | "resolved" | "closed"
       priority_level: "high" | "medium" | "low"
       sentiment_type: "highly_negative" | "negative" | "neutral" | "positive"
     }
@@ -305,7 +305,7 @@ export const Constants = {
         "Administration",
         "Other",
       ],
-      grievance_status: ["pending", "in_progress", "resolved"],
+      grievance_status: ["pending", "in_progress", "resolved", "closed"],
       priority_level: ["high", "medium", "low"],
       sentiment_type: ["highly_negative", "negative", "neutral", "positive"],
     },
