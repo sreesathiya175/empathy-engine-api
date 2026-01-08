@@ -5,7 +5,7 @@ import { Footer } from "@/components/layout/Footer";
 import { useAuth } from "@/hooks/useAuth";
 import { useGrievances, DbGrievance, useUpdateGrievanceStatus, useAssignGrievance } from "@/hooks/useGrievances";
 import { supabase } from "@/integrations/supabase/client";
-import { useStaff, StaffMember } from "@/hooks/useStaff";
+import { useStaff } from "@/hooks/useStaff";
 import { 
   Table, 
   TableBody, 
@@ -25,8 +25,9 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
-import { Search, MessageSquare, Shield } from "lucide-react";
+import { Search, MessageSquare, Shield, CheckSquare, X } from "lucide-react";
 import { AdminCommentsDialog } from "@/components/admin/AdminCommentsDialog";
 import { toast } from "@/hooks/use-toast";
 
@@ -46,6 +47,8 @@ export default function Admin() {
   const [profileCache, setProfileCache] = useState<ProfileCache>({});
   const [selectedGrievance, setSelectedGrievance] = useState<DbGrievance | null>(null);
   const [commentsOpen, setCommentsOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkProcessing, setBulkProcessing] = useState(false);
 
   const isAdmin = role === 'admin';
 
@@ -131,24 +134,92 @@ export default function Admin() {
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, string> = {
-      pending: "bg-yellow-100 text-yellow-800 border-yellow-200",
-      in_progress: "bg-blue-100 text-blue-800 border-blue-200",
-      resolved: "bg-green-100 text-green-800 border-green-200",
-      closed: "bg-gray-100 text-gray-800 border-gray-200"
-    };
-    const labels: Record<string, string> = {
-      pending: "Pending",
-      in_progress: "In Progress",
-      resolved: "Resolved",
-      closed: "Closed"
-    };
-    return (
-      <Badge className={`${variants[status] || variants.pending} border`}>
-        {labels[status] || status}
-      </Badge>
-    );
+  // Bulk action handlers
+  const handleBulkStatusChange = async (newStatus: string) => {
+    if (selectedIds.size === 0) return;
+    
+    setBulkProcessing(true);
+    const selectedGrievances = grievances?.filter(g => selectedIds.has(g.id)) || [];
+    
+    try {
+      await Promise.all(
+        selectedGrievances.map(grievance => 
+          updateStatus.mutateAsync({ 
+            id: grievance.id, 
+            status: newStatus as DbGrievance['status'],
+            grievance 
+          })
+        )
+      );
+      toast({
+        title: "Bulk Status Update",
+        description: `Updated ${selectedIds.size} grievance(s) to ${newStatus.replace('_', ' ')}.`
+      });
+      setSelectedIds(new Set());
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update some grievances.",
+        variant: "destructive"
+      });
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
+
+  const handleBulkAssign = async (staffId: string) => {
+    if (selectedIds.size === 0) return;
+    
+    setBulkProcessing(true);
+    const selectedGrievances = grievances?.filter(g => selectedIds.has(g.id)) || [];
+    
+    try {
+      await Promise.all(
+        selectedGrievances.map(grievance => 
+          assignGrievance.mutateAsync({ 
+            id: grievance.id, 
+            assignedTo: staffId === 'unassign' ? null : staffId,
+            grievance 
+          })
+        )
+      );
+      const staffMember = staff?.find(s => s.id === staffId);
+      toast({
+        title: "Bulk Assignment",
+        description: staffId === 'unassign' 
+          ? `Unassigned ${selectedIds.size} grievance(s).`
+          : `Assigned ${selectedIds.size} grievance(s) to ${staffMember?.name || staffMember?.email}.`
+      });
+      setSelectedIds(new Set());
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to assign some grievances.",
+        variant: "destructive"
+      });
+    } finally {
+      setBulkProcessing(false);
+    }
+  };
+
+  const toggleSelectAll = () => {
+    if (!filteredGrievances) return;
+    
+    if (selectedIds.size === filteredGrievances.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(filteredGrievances.map(g => g.id)));
+    }
+  };
+
+  const toggleSelect = (id: string) => {
+    const newSelected = new Set(selectedIds);
+    if (newSelected.has(id)) {
+      newSelected.delete(id);
+    } else {
+      newSelected.add(id);
+    }
+    setSelectedIds(newSelected);
   };
 
   const filteredGrievances = grievances?.filter(g => {
@@ -178,6 +249,9 @@ export default function Admin() {
     return null;
   }
 
+  const allSelected = filteredGrievances && filteredGrievances.length > 0 && selectedIds.size === filteredGrievances.length;
+  const someSelected = selectedIds.size > 0;
+
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Header 
@@ -198,22 +272,80 @@ export default function Admin() {
           </div>
         </div>
 
-        {/* Search */}
-        <div className="relative mb-6 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by name, title, or ticket ID..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-10"
-          />
+        {/* Search and Bulk Actions Bar */}
+        <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by name, title, or ticket ID..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-10"
+            />
+          </div>
         </div>
+
+        {/* Bulk Actions Toolbar */}
+        {someSelected && (
+          <div className="flex flex-wrap items-center gap-3 p-4 mb-4 bg-primary/5 border border-primary/20 rounded-lg animate-fade-in">
+            <div className="flex items-center gap-2">
+              <CheckSquare className="h-5 w-5 text-primary" />
+              <span className="font-medium">{selectedIds.size} selected</span>
+            </div>
+            
+            <div className="h-6 w-px bg-border" />
+            
+            <Select onValueChange={handleBulkStatusChange} disabled={bulkProcessing}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Set Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="in_progress">In Progress</SelectItem>
+                <SelectItem value="resolved">Resolved</SelectItem>
+                <SelectItem value="closed">Closed</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <Select onValueChange={handleBulkAssign} disabled={bulkProcessing}>
+              <SelectTrigger className="w-[160px]">
+                <SelectValue placeholder="Assign Staff" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="unassign">Unassigned</SelectItem>
+                {staff?.map((member) => (
+                  <SelectItem key={member.id} value={member.id}>
+                    {member.name || member.email}
+                    {member.role === 'admin' && " (Admin)"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={() => setSelectedIds(new Set())}
+              className="ml-auto"
+            >
+              <X className="h-4 w-4 mr-1" />
+              Clear
+            </Button>
+          </div>
+        )}
 
         {/* Grievances Table */}
         <div className="border rounded-lg overflow-hidden bg-card">
           <Table>
             <TableHeader>
               <TableRow className="bg-muted/50">
+                <TableHead className="w-12">
+                  <Checkbox 
+                    checked={allSelected}
+                    onCheckedChange={toggleSelectAll}
+                    aria-label="Select all"
+                  />
+                </TableHead>
                 <TableHead>Employee</TableHead>
                 <TableHead>Problem</TableHead>
                 <TableHead>Date</TableHead>
@@ -226,6 +358,7 @@ export default function Admin() {
               {grievancesLoading || staffLoading ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <TableRow key={i}>
+                    <TableCell><Skeleton className="h-4 w-4" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-24" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-48" /></TableCell>
                     <TableCell><Skeleton className="h-4 w-20" /></TableCell>
@@ -236,7 +369,17 @@ export default function Admin() {
                 ))
               ) : filteredGrievances && filteredGrievances.length > 0 ? (
                 filteredGrievances.map((grievance) => (
-                  <TableRow key={grievance.id}>
+                  <TableRow 
+                    key={grievance.id}
+                    className={selectedIds.has(grievance.id) ? "bg-primary/5" : ""}
+                  >
+                    <TableCell>
+                      <Checkbox 
+                        checked={selectedIds.has(grievance.id)}
+                        onCheckedChange={() => toggleSelect(grievance.id)}
+                        aria-label={`Select ${grievance.title}`}
+                      />
+                    </TableCell>
                     <TableCell className="font-medium">
                       {profileCache[grievance.user_id]?.name || 
                        profileCache[grievance.user_id]?.email || 
@@ -303,7 +446,7 @@ export default function Admin() {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                  <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     No grievances found
                   </TableCell>
                 </TableRow>
