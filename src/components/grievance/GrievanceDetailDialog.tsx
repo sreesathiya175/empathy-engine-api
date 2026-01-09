@@ -34,12 +34,14 @@ interface GrievanceDetailDialogProps {
 }
 
 export function GrievanceDetailDialog({ grievance, open, onOpenChange }: GrievanceDetailDialogProps) {
-  const { role } = useAuth();
+  const { role, user } = useAuth();
   const { data: staffList } = useStaff();
   const updateStatusMutation = useUpdateGrievanceStatus();
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
 
-  const isStaff = role === 'employee' || role === 'admin';
+  const isAdmin = role === 'admin';
+  const isAssignedStaff = user?.id === grievance.assigned_to;
+  const canUpdateStatus = isAdmin || isAssignedStaff;
   const assignedStaff = staffList?.find(s => s.id === grievance.assigned_to);
 
   const handleStatusChange = async (newStatus: DbGrievanceStatus) => {
@@ -108,36 +110,38 @@ export function GrievanceDetailDialog({ grievance, open, onOpenChange }: Grievan
             </div>
 
             {/* Staff Actions */}
-            {isStaff && (
+            {(canUpdateStatus || isAdmin) && (
               <div className="border-t border-border pt-4 space-y-4">
                 <h4 className="font-medium">Staff Actions</h4>
                 
                 <div className="flex flex-wrap gap-4">
-                  {/* Status Update */}
-                  <div className="space-y-2">
-                    <label className="text-sm text-muted-foreground">Update Status</label>
-                    <Select 
-                      value={grievance.status} 
-                      onValueChange={(val) => handleStatusChange(val as DbGrievanceStatus)}
-                      disabled={updateStatusMutation.isPending}
-                    >
-                      <SelectTrigger className="w-[160px]">
-                        {updateStatusMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                          <SelectValue />
-                        )}
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Pending</SelectItem>
-                        <SelectItem value="in_progress">In Progress</SelectItem>
-                        <SelectItem value="resolved">Resolved</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {/* Status Update - Only for assigned staff or admin */}
+                  {canUpdateStatus && (
+                    <div className="space-y-2">
+                      <label className="text-sm text-muted-foreground">Update Status</label>
+                      <Select 
+                        value={grievance.status} 
+                        onValueChange={(val) => handleStatusChange(val as DbGrievanceStatus)}
+                        disabled={updateStatusMutation.isPending}
+                      >
+                        <SelectTrigger className="w-[160px]">
+                          {updateStatusMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <SelectValue />
+                          )}
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="in_progress">In Progress</SelectItem>
+                          <SelectItem value="resolved">Resolved</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
 
                   {/* Assign Button (Admin only) */}
-                  {role === 'admin' && (
+                  {isAdmin && (
                     <div className="space-y-2">
                       <label className="text-sm text-muted-foreground">Assignment</label>
                       <Button 
@@ -151,6 +155,13 @@ export function GrievanceDetailDialog({ grievance, open, onOpenChange }: Grievan
                     </div>
                   )}
                 </div>
+
+                {/* Message for unassigned staff */}
+                {!canUpdateStatus && isAdmin === false && (
+                  <p className="text-sm text-muted-foreground">
+                    You must be assigned to this grievance to update its status.
+                  </p>
+                )}
               </div>
             )}
           </div>
